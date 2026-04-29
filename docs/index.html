@@ -276,26 +276,52 @@ function renderChart(container, bars, sym) {
 
   const priceChart = LightweightCharts.createChart(priceWrap, baseLayout);
 
-  // FVB cloud — two-area trick: upper area filled green/red down to lower band,
-  // then lower area painted with bg color to mask everything below the lower band.
-  const fvbColor = 'rgba(38,166,154,0.18)';      // teal cloud
-  const fvbLineColor = 'rgba(38,166,154,0.55)';
+  // FVB cloud — split into bull (green) and bear (red) regimes.
+  // For each regime: upper area filled with regime color, lower area painted with bg color
+  // to mask anything below the lower band. Include flip-transition bar in both regimes to avoid 1-bar gaps.
+  const greenFill = 'rgba(38,166,154,0.20)';
+  const redFill   = 'rgba(239,83,80,0.20)';
+  const greenLine = 'rgba(38,166,154,0.6)';
+  const redLine   = 'rgba(239,83,80,0.6)';
 
-  const upperArea = priceChart.addAreaSeries({
-    topColor: fvbColor, bottomColor: fvbColor,
-    lineColor: fvbLineColor, lineWidth: 1,
-    priceLineVisible: false, lastValueVisible: false,
-    crosshairMarkerVisible: false,
-  });
-  upperArea.setData(bars.map((b, i) => upper[i] != null ? { time: b.time, value: upper[i] } : null).filter(Boolean));
+  const upperGreen = [], lowerGreen = [], upperRed = [], lowerRed = [];
+  for (let i = 0; i < bars.length; i++) {
+    if (basis[i] == null || upper[i] == null || lower[i] == null) continue;
+    const isBull = closes[i] > basis[i];
+    const prevIsBull = i > 0 && basis[i-1] != null ? closes[i-1] > basis[i-1] : isBull;
+    const flipped = isBull !== prevIsBull;
+    if (isBull) {
+      upperGreen.push({ time: bars[i].time, value: upper[i] });
+      lowerGreen.push({ time: bars[i].time, value: lower[i] });
+      if (flipped) { // also extend red one bar into the bull side to bridge
+        upperRed.push({ time: bars[i].time, value: upper[i] });
+        lowerRed.push({ time: bars[i].time, value: lower[i] });
+      }
+    } else {
+      upperRed.push({ time: bars[i].time, value: upper[i] });
+      lowerRed.push({ time: bars[i].time, value: lower[i] });
+      if (flipped) {
+        upperGreen.push({ time: bars[i].time, value: upper[i] });
+        lowerGreen.push({ time: bars[i].time, value: lower[i] });
+      }
+    }
+  }
 
-  const lowerArea = priceChart.addAreaSeries({
-    topColor: TV_COLORS.bg, bottomColor: TV_COLORS.bg,
-    lineColor: fvbLineColor, lineWidth: 1,
-    priceLineVisible: false, lastValueVisible: false,
-    crosshairMarkerVisible: false,
-  });
-  lowerArea.setData(bars.map((b, i) => lower[i] != null ? { time: b.time, value: lower[i] } : null).filter(Boolean));
+  const mkArea = (data, top, bottom, line) => {
+    const s = priceChart.addAreaSeries({
+      topColor: top, bottomColor: bottom, lineColor: line, lineWidth: 1,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+    });
+    s.setData(data);
+    return s;
+  };
+
+  // Order matters: draw lower (bg-masking) AFTER upper so it overpaints the area below the lower band.
+  // But we need both green and red layers. Draw all uppers first, then all lowers.
+  mkArea(upperGreen, greenFill, greenFill, greenLine);
+  mkArea(upperRed,   redFill,   redFill,   redLine);
+  mkArea(lowerGreen, TV_COLORS.bg, TV_COLORS.bg, greenLine);
+  mkArea(lowerRed,   TV_COLORS.bg, TV_COLORS.bg, redLine);
 
   // Basis line (drawn on top of the cloud)
   const basisLine = priceChart.addLineSeries({
