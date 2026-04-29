@@ -207,9 +207,10 @@ const TV_COLORS = {
 let openChartSym = null;
 
 async function fetchBars(sym) {
-  // Yahoo chart endpoint allows CORS
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`;
+  const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`;
+  const url = `https://corsproxy.io/?url=${encodeURIComponent(target)}`;
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const j = await res.json();
   const r = j.chart.result[0];
   const t = r.timestamp;
