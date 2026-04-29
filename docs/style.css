@@ -80,6 +80,12 @@ tr.chart-row:hover { background: #131722 !important; }
 tr.chart-row td { padding: 0 !important; border-bottom: 1px solid var(--line); }
 .chart-container { background: #131722; border: 1px solid #2A2E39; border-top: none; }
 .chart-header { padding: 8px 12px; color: #d1d4dc; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; border-bottom: 1px solid #2A2E39; background: #1e222d; font-family: -apple-system, "Trebuchet MS", sans-serif; }
+.tv-header { padding: 8px 12px; background: #131722; border-bottom: 1px solid #2A2E39; font-family: -apple-system, "Trebuchet MS", sans-serif; font-size: 13px; color: #d1d4dc; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tv-header .tv-sym { font-weight: 700; color: #FFFFFF; font-size: 14px; }
+.tv-header .tv-tf { color: #787B86; }
+.tv-header .tv-ohlc { color: #787B86; letter-spacing: 0.02em; }
+.tv-header .tv-ohlc b { color: #d1d4dc; font-weight: 500; margin-right: 4px; }
+.tv-header .tv-change { font-weight: 600; }
 .chart-body { padding: 0; }
 .chart-loading, .chart-error { padding: 40px; text-align: center; color: #787B86; font-size: 13px; }
 .chart-error { color: #ef5350; }

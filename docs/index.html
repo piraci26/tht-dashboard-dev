@@ -176,7 +176,6 @@ function computeBXT(closes) {
   const diff = e5.map((v, i) => v != null && e20[i] != null ? v - e20[i] : null);
   const valid = diff.filter(v => v != null);
   const r = rsi(valid, 15);
-  // Pad back to original length
   const out = new Array(closes.length).fill(null);
   let j = 0;
   for (let i = 0; i < closes.length; i++) {
@@ -184,6 +183,28 @@ function computeBXT(closes) {
       out[i] = r[j] != null ? r[j] - 50 : null;
       j++;
     }
+  }
+  return out;
+}
+
+function computeBXTLong(closes) {
+  // long-term: RSI(close, 15) - 50
+  const r = rsi(closes, 15);
+  return r.map(v => v != null ? v - 50 : null);
+}
+
+function wma(arr, len) {
+  // Weighted moving average for smoothing
+  const out = new Array(arr.length).fill(null);
+  for (let i = len - 1; i < arr.length; i++) {
+    let valid = true, num = 0, denom = 0;
+    for (let j = 0; j < len; j++) {
+      const v = arr[i - j];
+      if (v == null) { valid = false; break; }
+      const w = len - j;
+      num += v * w; denom += w;
+    }
+    if (valid) out[i] = num / denom;
   }
   return out;
 }
@@ -214,26 +235,77 @@ async function fetchBars(sym) {
   return await res.json();
 }
 
-function renderChart(container, bars) {
+function renderChart(container, bars, sym) {
   container.innerHTML = '';
   const closes = bars.map(b => b.close);
   const { basis, upper, lower } = computeFVB(closes);
-  const bxt = computeBXT(closes);
+  const bxtShort = computeBXT(closes);
+  const bxtLong  = computeBXTLong(closes);
+  const bxtShortSmooth = wma(bxtShort, 5);
+  const bxtLongSmooth  = wma(bxtLong, 5);
 
-  // Main pane: candles + bands
+  // ─── TV-style OHLC header ─────────────────────────────────────────
+  const last = bars[bars.length - 1];
+  const prev = bars[bars.length - 2] || last;
+  const ch = last.close - prev.close;
+  const chPct = (ch / prev.close) * 100;
+  const chCol = ch >= 0 ? TV_COLORS.bull : TV_COLORS.bear;
+  const headBar = document.createElement('div');
+  headBar.className = 'tv-header';
+  headBar.innerHTML = `
+    <span class="tv-sym">${sym}</span>
+    <span class="tv-tf">· 1D ·</span>
+    <span class="tv-ohlc">O <b>${last.open.toFixed(2)}</b> H <b>${last.high.toFixed(2)}</b> L <b>${last.low.toFixed(2)}</b> C <b>${last.close.toFixed(2)}</b></span>
+    <span class="tv-change" style="color:${chCol}">${ch >= 0 ? '+' : ''}${ch.toFixed(2)} (${ch >= 0 ? '+' : ''}${chPct.toFixed(2)}%)</span>
+  `;
+  container.appendChild(headBar);
+
+  // ─── Price + FVB pane ─────────────────────────────────────────────
   const priceWrap = document.createElement('div');
   priceWrap.style.cssText = 'height: 360px; width: 100%;';
   container.appendChild(priceWrap);
 
-  const priceChart = LightweightCharts.createChart(priceWrap, {
-    layout: { background: { color: TV_COLORS.bg }, textColor: TV_COLORS.text, fontSize: 12, fontFamily: '-apple-system, "Trebuchet MS", sans-serif' },
+  const baseLayout = {
+    layout: { background: { color: TV_COLORS.bg }, textColor: TV_COLORS.text, fontSize: 11, fontFamily: '-apple-system, "Trebuchet MS", sans-serif' },
     grid: { vertLines: { color: TV_COLORS.grid }, horzLines: { color: TV_COLORS.grid } },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    rightPriceScale: { borderColor: TV_COLORS.border },
+    rightPriceScale: { borderColor: TV_COLORS.border, scaleMargins: { top: 0.05, bottom: 0.25 } },
     timeScale: { borderColor: TV_COLORS.border, timeVisible: false, secondsVisible: false },
     watermark: { visible: false },
-  });
+  };
 
+  const priceChart = LightweightCharts.createChart(priceWrap, baseLayout);
+
+  // FVB cloud — two-area trick: upper area filled green/red down to lower band,
+  // then lower area painted with bg color to mask everything below the lower band.
+  const fvbColor = 'rgba(38,166,154,0.18)';      // teal cloud
+  const fvbLineColor = 'rgba(38,166,154,0.55)';
+
+  const upperArea = priceChart.addAreaSeries({
+    topColor: fvbColor, bottomColor: fvbColor,
+    lineColor: fvbLineColor, lineWidth: 1,
+    priceLineVisible: false, lastValueVisible: false,
+    crosshairMarkerVisible: false,
+  });
+  upperArea.setData(bars.map((b, i) => upper[i] != null ? { time: b.time, value: upper[i] } : null).filter(Boolean));
+
+  const lowerArea = priceChart.addAreaSeries({
+    topColor: TV_COLORS.bg, bottomColor: TV_COLORS.bg,
+    lineColor: fvbLineColor, lineWidth: 1,
+    priceLineVisible: false, lastValueVisible: false,
+    crosshairMarkerVisible: false,
+  });
+  lowerArea.setData(bars.map((b, i) => lower[i] != null ? { time: b.time, value: lower[i] } : null).filter(Boolean));
+
+  // Basis line (drawn on top of the cloud)
+  const basisLine = priceChart.addLineSeries({
+    color: '#FFFFFF', lineWidth: 1,
+    priceLineVisible: true, priceLineColor: '#FFFFFF', priceLineStyle: 2,
+    lastValueVisible: true, crosshairMarkerVisible: false,
+  });
+  basisLine.setData(bars.map((b, i) => basis[i] != null ? { time: b.time, value: basis[i] } : null).filter(Boolean));
+
+  // Candles on top
   const candles = priceChart.addCandlestickSeries({
     upColor: TV_COLORS.bull, downColor: TV_COLORS.bear,
     borderUpColor: TV_COLORS.bull, borderDownColor: TV_COLORS.bear,
@@ -241,38 +313,93 @@ function renderChart(container, bars) {
   });
   candles.setData(bars);
 
-  const mkLine = (data, color, width=1) => {
-    const s = priceChart.addLineSeries({ color, lineWidth: width, priceLineVisible: false, lastValueVisible: false });
-    s.setData(bars.map((b, i) => data[i] != null ? { time: b.time, value: data[i] } : null).filter(Boolean));
-  };
-  mkLine(basis, TV_COLORS.basis, 2);
-  mkLine(upper, TV_COLORS.band, 1);
-  mkLine(lower, TV_COLORS.band, 1);
+  // Flip markers: green dot below bar on bull-flip, red dot above bar on bear-flip
+  const markers = [];
+  for (let i = 1; i < bars.length; i++) {
+    if (basis[i] == null || basis[i-1] == null) continue;
+    const bullToday = bars[i].close > basis[i];
+    const bullYest  = bars[i-1].close > basis[i-1];
+    if (bullToday && !bullYest) {
+      markers.push({ time: bars[i].time, position: 'belowBar', color: TV_COLORS.bull, shape: 'circle' });
+    } else if (!bullToday && bullYest) {
+      markers.push({ time: bars[i].time, position: 'aboveBar', color: TV_COLORS.bear, shape: 'circle' });
+    }
+  }
+  candles.setMarkers(markers);
 
-  // Sub-pane: BXT histogram
+  // Volume — overlay on price pane (bottom 20% of chart area)
+  const volSeries = priceChart.addHistogramSeries({
+    priceFormat: { type: 'volume' },
+    priceScaleId: 'volume',
+    color: 'rgba(120,123,134,0.5)',
+  });
+  volSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+  volSeries.setData(bars.map(b => ({
+    time: b.time, value: b.volume || 0,
+    color: b.close >= b.open ? 'rgba(38,166,154,0.4)' : 'rgba(239,83,80,0.4)',
+  })));
+
+  // ─── BXT pane ─────────────────────────────────────────────────────
   const bxtWrap = document.createElement('div');
-  bxtWrap.style.cssText = 'height: 130px; width: 100%; margin-top: 4px;';
+  bxtWrap.style.cssText = 'height: 150px; width: 100%; margin-top: 1px;';
   container.appendChild(bxtWrap);
 
   const bxtChart = LightweightCharts.createChart(bxtWrap, {
-    layout: { background: { color: TV_COLORS.bg }, textColor: TV_COLORS.text, fontSize: 11, fontFamily: '-apple-system, "Trebuchet MS", sans-serif' },
-    grid: { vertLines: { color: TV_COLORS.grid }, horzLines: { color: TV_COLORS.grid } },
-    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    rightPriceScale: { borderColor: TV_COLORS.border },
-    timeScale: { borderColor: TV_COLORS.border, timeVisible: false, secondsVisible: false },
-    watermark: { visible: true, color: 'rgba(120,123,134,0.3)', text: 'B-Xtrender', fontSize: 14, horzAlign: 'left', vertAlign: 'top' },
+    ...baseLayout,
+    rightPriceScale: { borderColor: TV_COLORS.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
+    watermark: { visible: true, color: 'rgba(120,123,134,0.25)', text: 'B-Xtrender', fontSize: 14, horzAlign: 'left', vertAlign: 'top' },
   });
-  const bxtSeries = bxtChart.addHistogramSeries({ priceFormat: { type: 'price', precision: 2, minMove: 0.01 } });
-  bxtSeries.setData(bars.map((b, i) => bxt[i] != null ? {
-    time: b.time, value: bxt[i],
-    color: bxt[i] >= 0 ? TV_COLORS.bxt_pos : TV_COLORS.bxt_neg,
+
+  // Short-term: histogram, light green positive / dark red negative
+  const shortHist = bxtChart.addHistogramSeries({
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+  });
+  shortHist.setData(bars.map((b, i) => bxtShort[i] != null ? {
+    time: b.time, value: bxtShort[i],
+    color: bxtShort[i] >= 0 ? 'rgba(38,166,154,0.55)' : 'rgba(239,83,80,0.55)',
   } : null).filter(Boolean));
 
-  // Sync time scales between panes
+  // Smoothed short-term BXT line (bright green/red)
+  const shortLine = bxtChart.addLineSeries({
+    color: '#26a69a', lineWidth: 2,
+    priceLineVisible: false, lastValueVisible: true,
+  });
+  shortLine.setData(bars.map((b, i) => bxtShortSmooth[i] != null ? { time: b.time, value: bxtShortSmooth[i] } : null).filter(Boolean));
+
+  // Long-term BXT smoothed (red signal line)
+  const longLine = bxtChart.addLineSeries({
+    color: '#ef5350', lineWidth: 2,
+    priceLineVisible: false, lastValueVisible: true,
+  });
+  longLine.setData(bars.map((b, i) => bxtLongSmooth[i] != null ? { time: b.time, value: bxtLongSmooth[i] } : null).filter(Boolean));
+
+  // Crossover dots: when shortSmooth crosses longSmooth
+  const xMarkers = [];
+  for (let i = 1; i < bars.length; i++) {
+    const a = bxtShortSmooth, b = bxtLongSmooth;
+    if (a[i] == null || a[i-1] == null || b[i] == null || b[i-1] == null) continue;
+    if (a[i-1] <= b[i-1] && a[i] > b[i]) {
+      xMarkers.push({ time: bars[i].time, position: 'belowBar', color: TV_COLORS.bull, shape: 'circle' });
+    } else if (a[i-1] >= b[i-1] && a[i] < b[i]) {
+      xMarkers.push({ time: bars[i].time, position: 'aboveBar', color: TV_COLORS.bear, shape: 'circle' });
+    }
+  }
+  shortLine.setMarkers(xMarkers);
+
+  // Sync time scales
   priceChart.timeScale().subscribeVisibleLogicalRangeChange(r => r && bxtChart.timeScale().setVisibleLogicalRange(r));
   bxtChart.timeScale().subscribeVisibleLogicalRangeChange(r => r && priceChart.timeScale().setVisibleLogicalRange(r));
-
   priceChart.timeScale().fitContent();
+
+  // Sync crosshair
+  priceChart.subscribeCrosshairMove(p => {
+    if (!p.time) return;
+    bxtChart.setCrosshairPosition(0, p.time, longLine);
+  });
+  bxtChart.subscribeCrosshairMove(p => {
+    if (!p.time) return;
+    priceChart.setCrosshairPosition(0, p.time, basisLine);
+  });
 }
 
 async function toggleChart(tr, sym) {
@@ -290,7 +417,7 @@ async function toggleChart(tr, sym) {
   const chartRow = document.createElement('tr');
   chartRow.className = 'chart-row';
   chartRow.dataset.sym = sym;
-  chartRow.innerHTML = `<td colspan="${colspan}"><div class="chart-container"><div class="chart-header">${sym} · 1Y Daily · THT Fair Value Bands + B-Xtrender</div><div class="chart-body"><div class="chart-loading">Loading…</div></div></div></td>`;
+  chartRow.innerHTML = `<td colspan="${colspan}"><div class="chart-container"><div class="chart-body"><div class="chart-loading">Loading…</div></div></div></td>`;
   tr.parentNode.insertBefore(chartRow, tr.nextSibling);
   openChartSym = sym;
 
@@ -299,7 +426,7 @@ async function toggleChart(tr, sym) {
     if (bars.length < 25) throw new Error('Not enough bars');
     const body = chartRow.querySelector('.chart-body');
     body.innerHTML = '';
-    renderChart(body, bars);
+    renderChart(body, bars, sym);
   } catch (e) {
     chartRow.querySelector('.chart-body').innerHTML = `<div class="chart-error">Failed to load: ${e.message}</div>`;
   }
