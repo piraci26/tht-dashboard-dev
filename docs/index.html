@@ -276,27 +276,18 @@ function renderChart(container, bars, sym) {
 
   const priceChart = LightweightCharts.createChart(priceWrap, baseLayout);
 
-  // FVB cloud — split into bull (green) and bear (red) regimes.
-  // For each regime: upper area filled with regime color, lower area painted with bg color
-  // to mask anything below the lower band. Include flip-transition bar in both regimes to avoid 1-bar gaps.
-  const greenFill = 'rgba(38,166,154,0.20)';
-  const redFill   = 'rgba(239,83,80,0.20)';
-  const greenLine = 'rgba(38,166,154,0.6)';
-  const redLine   = 'rgba(239,83,80,0.6)';
+  // FVB cloud — group consecutive same-regime bars into segments, render each as one pair
+  // of area series (upper = regime fill, lower = bg mask). NO bridge → tiny 1-px gap at flips,
+  // which is way better than the mud-color overlap from bridging.
+  const greenFill = 'rgba(0,135,90,0.40)';   // saturated TV green
+  const redFill   = 'rgba(120,40,40,0.45)';  // dark TV red
 
-  // Group consecutive bars with same regime into segments. Each segment gets its own
-  // pair of area series (upper colored, lower bg-masking) so colors never overlap.
   const segments = [];
   let curr = null;
   for (let i = 0; i < bars.length; i++) {
     if (upper[i] == null || lower[i] == null || basis[i] == null) continue;
     const type = closes[i] > basis[i] ? 'bull' : 'bear';
     if (!curr || curr.type !== type) {
-      // Bridge: include this transition bar at end of previous segment so fills meet.
-      if (curr) {
-        curr.upper.push({ time: bars[i].time, value: upper[i] });
-        curr.lower.push({ time: bars[i].time, value: lower[i] });
-      }
       curr = { type, upper: [], lower: [] };
       segments.push(curr);
     }
@@ -306,13 +297,11 @@ function renderChart(container, bars, sym) {
 
   for (const seg of segments) {
     const fill = seg.type === 'bull' ? greenFill : redFill;
-    // Upper: filled with regime color
     const u = priceChart.addAreaSeries({
       topColor: fill, bottomColor: fill, lineColor: 'rgba(0,0,0,0)', lineWidth: 0,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
     });
     u.setData(seg.upper);
-    // Lower: filled with bg color to mask below the lower band
     const l = priceChart.addAreaSeries({
       topColor: TV_COLORS.bg, bottomColor: TV_COLORS.bg, lineColor: 'rgba(0,0,0,0)', lineWidth: 0,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
@@ -320,10 +309,18 @@ function renderChart(container, bars, sym) {
     l.setData(seg.lower);
   }
 
-  // Basis line (drawn on top of the cloud)
+  // 200-period SMA — TV-style longer-term reference line in blue
+  const sma200 = sma(closes, 200);
+  const sma200Line = priceChart.addLineSeries({
+    color: '#1976D2', lineWidth: 1,
+    priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+  });
+  sma200Line.setData(bars.map((b, i) => sma200[i] != null ? { time: b.time, value: sma200[i] } : null).filter(Boolean));
+
+  // Basis line (drawn on top of the cloud) — TV blue
   const basisLine = priceChart.addLineSeries({
-    color: '#FFFFFF', lineWidth: 1,
-    priceLineVisible: true, priceLineColor: '#FFFFFF', priceLineStyle: 2,
+    color: '#2962FF', lineWidth: 2,
+    priceLineVisible: true, priceLineColor: '#2962FF', priceLineStyle: 2,
     lastValueVisible: true, crosshairMarkerVisible: false,
   });
   basisLine.setData(bars.map((b, i) => basis[i] != null ? { time: b.time, value: basis[i] } : null).filter(Boolean));
@@ -336,19 +333,19 @@ function renderChart(container, bars, sym) {
   });
   candles.setData(bars);
 
-  // Flip markers: green dot below bar on bull-flip, red dot above bar on bear-flip
+  // Flip markers placed ON the basis line (TV-style)
   const markers = [];
   for (let i = 1; i < bars.length; i++) {
     if (basis[i] == null || basis[i-1] == null) continue;
     const bullToday = bars[i].close > basis[i];
     const bullYest  = bars[i-1].close > basis[i-1];
     if (bullToday && !bullYest) {
-      markers.push({ time: bars[i].time, position: 'belowBar', color: TV_COLORS.bull, shape: 'circle' });
+      markers.push({ time: bars[i].time, position: 'inBar', color: '#26a69a', shape: 'circle', size: 1.2 });
     } else if (!bullToday && bullYest) {
-      markers.push({ time: bars[i].time, position: 'aboveBar', color: TV_COLORS.bear, shape: 'circle' });
+      markers.push({ time: bars[i].time, position: 'inBar', color: '#ef5350', shape: 'circle', size: 1.2 });
     }
   }
-  candles.setMarkers(markers);
+  basisLine.setMarkers(markers);
 
   // Volume — overlay on price pane (bottom 20% of chart area)
   const volSeries = priceChart.addHistogramSeries({
@@ -373,25 +370,25 @@ function renderChart(container, bars, sym) {
     watermark: { visible: true, color: 'rgba(120,123,134,0.25)', text: 'B-Xtrender', fontSize: 14, horzAlign: 'left', vertAlign: 'top' },
   });
 
-  // Short-term: histogram, light green positive / dark red negative
+  // Short-term: histogram — bright lime green positive / dark crimson negative
   const shortHist = bxtChart.addHistogramSeries({
     priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
   });
   shortHist.setData(bars.map((b, i) => bxtShort[i] != null ? {
     time: b.time, value: bxtShort[i],
-    color: bxtShort[i] >= 0 ? 'rgba(38,166,154,0.55)' : 'rgba(239,83,80,0.55)',
+    color: bxtShort[i] >= 0 ? '#00C853' : '#B71C1C',
   } : null).filter(Boolean));
 
-  // Smoothed short-term BXT line (bright green/red)
+  // Smoothed short-term BXT line (bright green)
   const shortLine = bxtChart.addLineSeries({
-    color: '#26a69a', lineWidth: 2,
+    color: '#00E676', lineWidth: 2,
     priceLineVisible: false, lastValueVisible: true,
   });
   shortLine.setData(bars.map((b, i) => bxtShortSmooth[i] != null ? { time: b.time, value: bxtShortSmooth[i] } : null).filter(Boolean));
 
-  // Long-term BXT smoothed (red signal line)
+  // Long-term BXT smoothed (bright red)
   const longLine = bxtChart.addLineSeries({
-    color: '#ef5350', lineWidth: 2,
+    color: '#FF5252', lineWidth: 2,
     priceLineVisible: false, lastValueVisible: true,
   });
   longLine.setData(bars.map((b, i) => bxtLongSmooth[i] != null ? { time: b.time, value: bxtLongSmooth[i] } : null).filter(Boolean));
