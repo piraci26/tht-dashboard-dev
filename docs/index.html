@@ -207,23 +207,11 @@ const TV_COLORS = {
 let openChartSym = null;
 
 async function fetchBars(sym) {
-  const target = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`;
-  const url = `https://corsproxy.io/?url=${encodeURIComponent(target)}`;
+  // Bars are pre-cached by scan.py in the prod repo (same origin, no CORS).
+  const url = `/tht-dashboard/bars/${encodeURIComponent(sym)}.json?t=${Date.now()}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const j = await res.json();
-  const r = j.chart.result[0];
-  const t = r.timestamp;
-  const q = r.indicators.quote[0];
-  const out = [];
-  for (let i = 0; i < t.length; i++) {
-    if (q.open[i] == null) continue;
-    out.push({
-      time: t[i],
-      open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i],
-    });
-  }
-  return out;
+  if (!res.ok) throw new Error(`HTTP ${res.status} (no cached bars for ${sym})`);
+  return await res.json();
 }
 
 function renderChart(container, bars) {
@@ -384,7 +372,7 @@ function renderChanges(changes) {
 
 async function load() {
   try {
-    const res = await fetch('results.json?t=' + Date.now());
+    const res = await fetch('/tht-dashboard/results.json?t=' + Date.now());
     const data = await res.json();
     document.getElementById('updated').textContent = fmtUpd(data.updated_at);
     document.getElementById('stats').textContent =
