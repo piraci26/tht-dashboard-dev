@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>THT Dual Scan — S&P 500</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>THT Dual Scan</h1>
+<div class="meta">
+  <span id="updated">Loading...</span>
+  <span class="separator">·</span>
+  <span id="stats"></span>
+</div>
+<p class="subtitle">S&P 500 names where both <strong>THT Fair Value Bands</strong> AND <strong>B-Xtrender</strong> flipped on the same day.</p>
+</header>
+
+<main>
+<section class="changes">
+<h2><span class="dot dot-changes"></span>Changes since last 5-min refresh</h2>
+<div id="changes-table" class="table-wrap"></div>
+</section>
+
+<section class="green">
+<h2><span class="dot dot-green"></span>Both flipped GREEN today</h2>
+<div id="green-table" class="table-wrap"></div>
+</section>
+
+<section class="red">
+<h2><span class="dot dot-red"></span>Both flipped RED today</h2>
+<div id="red-table" class="table-wrap"></div>
+</section>
+</main>
+
+<footer>
+<p>Auto-refreshes every 30 seconds. Yahoo Finance daily OHLCV. Indicator math from open-source Pine.</p>
+</footer>
+
+<script>
+const fmtMcap = b => !b ? '—' : b >= 1000 ? `$${(b/1000).toFixed(2)}T` : `$${b}B`;
+const fmtPct  = p => p == null ? '—' : `+${p.toFixed(1)}%`;
+const fmtUpd  = iso => {
+  const d = new Date(iso);
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZoneName: 'short'
+  }).formatToParts(d).reduce((o,p) => (o[p.type]=p.value, o), {});
+  return `Updated ${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} ${parts.timeZoneName}`;
+};
+
+// Sort state per table id: { col, dir }
+const sortState = { 'green-table': {col:'mcap', dir:'desc'}, 'red-table': {col:'mcap', dir:'desc'} };
+
+const COLS = [
+  {key:'idx',         label:'#',         cls:'num',  type:'idx'},
+  {key:'name',        label:'Company',   cls:'',     type:'str'},
+  {key:'sym',         label:'Sym',       cls:'',     type:'str'},
+  {key:'mcap',        label:'Mkt Cap',   cls:'num',  type:'num'},
+  {key:'price',       label:'Price',     cls:'num',  type:'num'},
+  {key:'basis',       label:'Basis',     cls:'num',  type:'num'},
+  {key:'bxt_today',   label:'BXT',       cls:'num',  type:'num'},
+  {key:'ath',         label:'ATH',       cls:'num',  type:'num'},
+  {key:'pct_to_ath',  label:'% to ATH',  cls:'num',  type:'num'},
+];
+
+function sortRows(rows, col, dir) {
+  if (col === 'idx') return rows;
+  const sorted = rows.slice();
+  sorted.sort((a, b) => {
+    let av = a[col], bv = b[col];
+    if (av == null) av = (typeof bv === 'number') ? -Infinity : '';
+    if (bv == null) bv = (typeof av === 'number') ? -Infinity : '';
+    if (typeof av === 'string') return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    return dir === 'asc' ? av - bv : bv - av;
+  });
+  return sorted;
+}
+
+function renderTable(rows, tableId) {
+  if (!rows || rows.length === 0) {
+    return '<p class="empty">No flips in this bucket.</p>';
+  }
+  const state = sortState[tableId];
+  const sorted = sortRows(rows, state.col, state.dir);
+  const arrow = (key) => {
+    if (key === 'idx') return '';
+    if (state.col !== key) return '<span class="sort-arrow">↕</span>';
+    return state.dir === 'asc' ? '<span class="sort-arrow active">↑</span>' : '<span class="sort-arrow active">↓</span>';
+  };
+  const headCells = COLS.map(c => {
+    const cls = (c.cls + ' sortable' + (state.col === c.key ? ' sorted' : '')).trim();
+    return `<th class="${cls}" data-col="${c.key}" data-table="${tableId}">${c.label} ${arrow(c.key)}</th>`;
+  }).join('');
+  const head = `<table><thead><tr>${headCells}</tr></thead><tbody>`;
+  const body = sorted.map((r,i) => `<tr>
+    <td class="num">${i+1}</td>
+    <td>${r.name}</td>
+    <td><strong>${r.sym}</strong></td>
+    <td class="num">${fmtMcap(r.mcap)}</td>
+    <td class="num">$${r.price.toFixed(2)}</td>
+    <td class="num">$${r.basis.toFixed(2)}</td>
+    <td class="num">${r.bxt_today.toFixed(2)}</td>
+    <td class="num">${r.ath != null ? '$' + r.ath.toFixed(2) : '—'}</td>
+    <td class="num">${fmtPct(r.pct_to_ath)}</td>
+  </tr>`).join('');
+  return head + body + '</tbody></table>';
+}
+
+// Persistent click handler delegated on body so it survives re-renders
+document.addEventListener('click', e => {
+  const th = e.target.closest('th.sortable');
+  if (!th) return;
+  const col = th.dataset.col;
+  const tableId = th.dataset.table;
+  if (!col || !tableId || col === 'idx') return;
+  const state = sortState[tableId];
+  if (state.col === col) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+  else { state.col = col; state.dir = (col === 'name' || col === 'sym') ? 'asc' : 'desc'; }
+  if (currentData) {
+    const rows = tableId === 'green-table' ? currentData.both_green : currentData.both_red;
+    document.getElementById(tableId).innerHTML = renderTable(rows, tableId);
+  }
+});
+
+let currentData = null;
+
+function renderChanges(changes) {
+  if (!changes) return '<p class="empty">No prior run to compare to.</p>';
+  const buckets = [
+    {label: '🟢 New GREEN',     items: changes.green_added,   action: 'added',   color: 'green'},
+    {label: '🟢 GREEN dropped', items: changes.green_removed, action: 'removed', color: 'green'},
+    {label: '🔴 New RED',       items: changes.red_added,     action: 'added',   color: 'red'},
+    {label: '🔴 RED dropped',   items: changes.red_removed,   action: 'removed', color: 'red'},
+  ];
+  const total = buckets.reduce((s,b) => s + (b.items?.length || 0), 0);
+  if (total === 0) {
+    return '<p class="empty">No changes since last refresh.</p>';
+  }
+  const head = `<table>
+    <thead><tr>
+      <th>Bucket</th><th>Action</th>
+      <th>Company</th><th>Sym</th>
+      <th class="num">Mkt Cap</th>
+      <th class="num">Price</th>
+      <th class="num">Basis</th>
+      <th class="num">BXT</th>
+      <th class="num">ATH</th>
+      <th class="num">% to ATH</th>
+    </tr></thead><tbody>`;
+  const cell = (v, prefix='') => v == null ? '—' : `${prefix}${typeof v === 'number' ? v.toFixed(2) : v}`;
+  const body = buckets.flatMap(b =>
+    (b.items || []).map(item => `<tr>
+      <td>${b.label}</td>
+      <td><span class="badge badge-${b.color} badge-${b.action}">${b.action.toUpperCase()}</span></td>
+      <td>${item.name}</td>
+      <td><strong>${item.sym}</strong></td>
+      <td class="num">${fmtMcap(item.mcap)}</td>
+      <td class="num">${cell(item.price, '$')}</td>
+      <td class="num">${cell(item.basis, '$')}</td>
+      <td class="num">${cell(item.bxt_today)}</td>
+      <td class="num">${cell(item.ath, '$')}</td>
+      <td class="num">${item.pct_to_ath != null ? '+' + item.pct_to_ath.toFixed(1) + '%' : '—'}</td>
+    </tr>`)
+  ).join('');
+  return head + body + '</tbody></table>';
+}
+
+async function load() {
+  try {
+    const res = await fetch('results.json?t=' + Date.now());
+    const data = await res.json();
+    document.getElementById('updated').textContent = fmtUpd(data.updated_at);
+    document.getElementById('stats').textContent =
+      `${data.scanned_count} scanned in ${data.scan_seconds}s · ${data.both_green.length} green / ${data.both_red.length} red`;
+    currentData = data;
+    document.getElementById('changes-table').innerHTML = renderChanges(data.changes);
+    document.getElementById('green-table').innerHTML = renderTable(data.both_green, 'green-table');
+    document.getElementById('red-table').innerHTML = renderTable(data.both_red, 'red-table');
+  } catch (e) {
+    document.getElementById('updated').textContent = 'Failed to load results.json';
+  }
+}
+
+load();
+setInterval(load, 30000);
+
+// Re-fetch immediately when the tab regains focus (defeats browser throttling)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') load();
+});
+window.addEventListener('focus', load);
+
+// Watchdog: hard reload the whole page if data is more than 12 min old
+// (catches edge cases where setInterval got fully suspended)
+setInterval(() => {
+  if (!currentData || !currentData.updated_at) return;
+  const ageMin = (Date.now() - new Date(currentData.updated_at)) / 60000;
+  if (ageMin > 12) location.reload();
+}, 60000);
+</script>
+</body>
+</html>
