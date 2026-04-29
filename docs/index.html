@@ -284,44 +284,41 @@ function renderChart(container, bars, sym) {
   const greenLine = 'rgba(38,166,154,0.6)';
   const redLine   = 'rgba(239,83,80,0.6)';
 
-  // Build per-regime data using "whitespace" entries (time-only, no value) at non-matching bars.
-  // Whitespace breaks the area's polygon cleanly so colors don't overlap.
-  const upperGreen = [], lowerGreen = [], upperRed = [], lowerRed = [];
+  // Group consecutive bars with same regime into segments. Each segment gets its own
+  // pair of area series (upper colored, lower bg-masking) so colors never overlap.
+  const segments = [];
+  let curr = null;
   for (let i = 0; i < bars.length; i++) {
-    if (upper[i] == null || lower[i] == null || basis[i] == null) {
-      const ws = { time: bars[i].time };
-      upperGreen.push(ws); lowerGreen.push(ws); upperRed.push(ws); lowerRed.push(ws);
-      continue;
+    if (upper[i] == null || lower[i] == null || basis[i] == null) continue;
+    const type = closes[i] > basis[i] ? 'bull' : 'bear';
+    if (!curr || curr.type !== type) {
+      // Bridge: include this transition bar at end of previous segment so fills meet.
+      if (curr) {
+        curr.upper.push({ time: bars[i].time, value: upper[i] });
+        curr.lower.push({ time: bars[i].time, value: lower[i] });
+      }
+      curr = { type, upper: [], lower: [] };
+      segments.push(curr);
     }
-    const isBull = closes[i] > basis[i];
-    if (isBull) {
-      upperGreen.push({ time: bars[i].time, value: upper[i] });
-      lowerGreen.push({ time: bars[i].time, value: lower[i] });
-      upperRed.push({ time: bars[i].time });
-      lowerRed.push({ time: bars[i].time });
-    } else {
-      upperRed.push({ time: bars[i].time, value: upper[i] });
-      lowerRed.push({ time: bars[i].time, value: lower[i] });
-      upperGreen.push({ time: bars[i].time });
-      lowerGreen.push({ time: bars[i].time });
-    }
+    curr.upper.push({ time: bars[i].time, value: upper[i] });
+    curr.lower.push({ time: bars[i].time, value: lower[i] });
   }
 
-  const mkArea = (data, top, bottom, line) => {
-    const s = priceChart.addAreaSeries({
-      topColor: top, bottomColor: bottom, lineColor: line, lineWidth: 1,
+  for (const seg of segments) {
+    const fill = seg.type === 'bull' ? greenFill : redFill;
+    // Upper: filled with regime color
+    const u = priceChart.addAreaSeries({
+      topColor: fill, bottomColor: fill, lineColor: 'rgba(0,0,0,0)', lineWidth: 0,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
     });
-    s.setData(data);
-    return s;
-  };
-
-  // Order matters: draw lower (bg-masking) AFTER upper so it overpaints the area below the lower band.
-  // But we need both green and red layers. Draw all uppers first, then all lowers.
-  mkArea(upperGreen, greenFill, greenFill, greenLine);
-  mkArea(upperRed,   redFill,   redFill,   redLine);
-  mkArea(lowerGreen, TV_COLORS.bg, TV_COLORS.bg, greenLine);
-  mkArea(lowerRed,   TV_COLORS.bg, TV_COLORS.bg, redLine);
+    u.setData(seg.upper);
+    // Lower: filled with bg color to mask below the lower band
+    const l = priceChart.addAreaSeries({
+      topColor: TV_COLORS.bg, bottomColor: TV_COLORS.bg, lineColor: 'rgba(0,0,0,0)', lineWidth: 0,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+    });
+    l.setData(seg.lower);
+  }
 
   // Basis line (drawn on top of the cloud)
   const basisLine = priceChart.addLineSeries({
