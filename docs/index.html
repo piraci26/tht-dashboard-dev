@@ -325,14 +325,6 @@ function renderChart(container, bars, sym) {
     lowerEdgeLine.setData(seg.lower);
   }
 
-  // 200-period SMA — TV-style longer-term reference line in blue
-  const sma200 = sma(closes, 200);
-  const sma200Line = priceChart.addLineSeries({
-    color: '#1976D2', lineWidth: 1,
-    priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-  });
-  sma200Line.setData(bars.map((b, i) => sma200[i] != null ? { time: b.time, value: sma200[i] } : null).filter(Boolean));
-
   // Basis line (drawn on top of the cloud) — TV blue
   const basisLine = priceChart.addLineSeries({
     color: '#2962FF', lineWidth: 2,
