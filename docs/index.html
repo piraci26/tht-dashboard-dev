@@ -284,26 +284,26 @@ function renderChart(container, bars, sym) {
   const greenLine = 'rgba(38,166,154,0.6)';
   const redLine   = 'rgba(239,83,80,0.6)';
 
+  // Build per-regime data using "whitespace" entries (time-only, no value) at non-matching bars.
+  // Whitespace breaks the area's polygon cleanly so colors don't overlap.
   const upperGreen = [], lowerGreen = [], upperRed = [], lowerRed = [];
   for (let i = 0; i < bars.length; i++) {
-    if (basis[i] == null || upper[i] == null || lower[i] == null) continue;
+    if (upper[i] == null || lower[i] == null || basis[i] == null) {
+      const ws = { time: bars[i].time };
+      upperGreen.push(ws); lowerGreen.push(ws); upperRed.push(ws); lowerRed.push(ws);
+      continue;
+    }
     const isBull = closes[i] > basis[i];
-    const prevIsBull = i > 0 && basis[i-1] != null ? closes[i-1] > basis[i-1] : isBull;
-    const flipped = isBull !== prevIsBull;
     if (isBull) {
       upperGreen.push({ time: bars[i].time, value: upper[i] });
       lowerGreen.push({ time: bars[i].time, value: lower[i] });
-      if (flipped) { // also extend red one bar into the bull side to bridge
-        upperRed.push({ time: bars[i].time, value: upper[i] });
-        lowerRed.push({ time: bars[i].time, value: lower[i] });
-      }
+      upperRed.push({ time: bars[i].time });
+      lowerRed.push({ time: bars[i].time });
     } else {
       upperRed.push({ time: bars[i].time, value: upper[i] });
       lowerRed.push({ time: bars[i].time, value: lower[i] });
-      if (flipped) {
-        upperGreen.push({ time: bars[i].time, value: upper[i] });
-        lowerGreen.push({ time: bars[i].time, value: lower[i] });
-      }
+      upperGreen.push({ time: bars[i].time });
+      lowerGreen.push({ time: bars[i].time });
     }
   }
 
