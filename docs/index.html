@@ -295,8 +295,13 @@ function renderChart(container, bars, sym) {
     curr.lower.push({ time: bars[i].time, value: lower[i] });
   }
 
+  const greenEdge = '#26a69a';
+  const redEdge   = '#ef5350';
+
   for (const seg of segments) {
     const fill = seg.type === 'bull' ? greenFill : redFill;
+    const edge = seg.type === 'bull' ? greenEdge : redEdge;
+    // Fill (upper) + bg-mask (lower)
     const u = priceChart.addAreaSeries({
       topColor: fill, bottomColor: fill, lineColor: 'rgba(0,0,0,0)', lineWidth: 0,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
@@ -307,6 +312,17 @@ function renderChart(container, bars, sym) {
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
     });
     l.setData(seg.lower);
+    // Thick edge lines on upper + lower bands, regime-colored
+    const upperEdgeLine = priceChart.addLineSeries({
+      color: edge, lineWidth: 2,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+    });
+    upperEdgeLine.setData(seg.upper);
+    const lowerEdgeLine = priceChart.addLineSeries({
+      color: edge, lineWidth: 2,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+    });
+    lowerEdgeLine.setData(seg.lower);
   }
 
   // 200-period SMA — TV-style longer-term reference line in blue
