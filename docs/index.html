@@ -6,18 +6,19 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>THT Dual Scan — S&P 500</title>
+<title>[DEV] THT Dual Scan — S&P 500</title>
 <link rel="stylesheet" href="style.css">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 <header>
-<h1>THT Dual Scan</h1>
+<h1>THT Dual Scan <span class="dev-badge">DEV</span></h1>
 <div class="meta">
   <span id="updated">Loading...</span>
   <span class="separator">·</span>
   <span id="stats"></span>
 </div>
-<p class="subtitle">S&P 500 names where both <strong>THT Fair Value Bands</strong> AND <strong>B-Xtrender</strong> flipped on the same day.</p>
+<p class="subtitle">S&P 500 names where both <strong>THT Fair Value Bands</strong> AND <strong>B-Xtrender</strong> flipped on the same day. Click any row to expand chart.</p>
 </header>
 
 <main>
@@ -55,7 +56,6 @@ const fmtUpd  = iso => {
   return `Updated ${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} ${parts.timeZoneName}`;
 };
 
-// Sort state per table id: { col, dir }
 const sortState = { 'green-table': {col:'mcap', dir:'desc'}, 'red-table': {col:'mcap', dir:'desc'} };
 
 const COLS = [
@@ -99,7 +99,7 @@ function renderTable(rows, tableId) {
     return `<th class="${cls}" data-col="${c.key}" data-table="${tableId}">${c.label} ${arrow(c.key)}</th>`;
   }).join('');
   const head = `<table><thead><tr>${headCells}</tr></thead><tbody>`;
-  const body = sorted.map((r,i) => `<tr>
+  const body = sorted.map((r,i) => `<tr class="row-clickable" data-sym="${r.sym}">
     <td class="num">${i+1}</td>
     <td>${r.name}</td>
     <td><strong>${r.sym}</strong></td>
@@ -113,19 +113,230 @@ function renderTable(rows, tableId) {
   return head + body + '</tbody></table>';
 }
 
-// Persistent click handler delegated on body so it survives re-renders
+// ─────────────────────────────────────────────────────────────────
+// Indicator math (mirrors scan.py — THT Fair Value Bands + B-Xtrender)
+// ─────────────────────────────────────────────────────────────────
+function sma(arr, len) {
+  const out = new Array(arr.length).fill(null);
+  for (let i = len - 1; i < arr.length; i++) {
+    let s = 0; for (let j = i - len + 1; j <= i; j++) s += arr[j];
+    out[i] = s / len;
+  }
+  return out;
+}
+function stdev(arr, len) {
+  const out = new Array(arr.length).fill(null);
+  for (let i = len - 1; i < arr.length; i++) {
+    let m = 0; for (let j = i - len + 1; j <= i; j++) m += arr[j]; m /= len;
+    let v = 0; for (let j = i - len + 1; j <= i; j++) v += (arr[j] - m) ** 2;
+    out[i] = Math.sqrt(v / len);
+  }
+  return out;
+}
+function ema(arr, len) {
+  const out = new Array(arr.length).fill(null);
+  if (arr.length < len) return out;
+  const k = 2 / (len + 1);
+  let e = 0; for (let i = 0; i < len; i++) e += arr[i]; e /= len;
+  out[len - 1] = e;
+  for (let i = len; i < arr.length; i++) { e = arr[i] * k + e * (1 - k); out[i] = e; }
+  return out;
+}
+function rsi(arr, len) {
+  const out = new Array(arr.length).fill(null);
+  if (arr.length <= len) return out;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= len; i++) {
+    const ch = arr[i] - arr[i - 1];
+    if (ch > 0) gains += ch; else losses -= ch;
+  }
+  let avgG = gains / len, avgL = losses / len;
+  out[len] = 100 - 100 / (1 + (avgL === 0 ? Infinity : avgG / avgL));
+  for (let i = len + 1; i < arr.length; i++) {
+    const ch = arr[i] - arr[i - 1];
+    const g = ch > 0 ? ch : 0, l = ch < 0 ? -ch : 0;
+    avgG = (avgG * (len - 1) + g) / len;
+    avgL = (avgL * (len - 1) + l) / len;
+    out[i] = 100 - 100 / (1 + (avgL === 0 ? Infinity : avgG / avgL));
+  }
+  return out;
+}
+
+function computeFVB(closes) {
+  const basis = sma(closes, 20);
+  const sd    = stdev(closes, 20);
+  const upper = basis.map((b, i) => b == null ? null : b + 2 * sd[i]);
+  const lower = basis.map((b, i) => b == null ? null : b - 2 * sd[i]);
+  return { basis, upper, lower };
+}
+
+function computeBXT(closes) {
+  const e5  = ema(closes, 5);
+  const e20 = ema(closes, 20);
+  const diff = e5.map((v, i) => v != null && e20[i] != null ? v - e20[i] : null);
+  const valid = diff.filter(v => v != null);
+  const r = rsi(valid, 15);
+  // Pad back to original length
+  const out = new Array(closes.length).fill(null);
+  let j = 0;
+  for (let i = 0; i < closes.length; i++) {
+    if (diff[i] != null) {
+      out[i] = r[j] != null ? r[j] - 50 : null;
+      j++;
+    }
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Chart rendering
+// ─────────────────────────────────────────────────────────────────
+const TV_COLORS = {
+  bg:        '#131722',
+  text:      '#d1d4dc',
+  grid:      '#1e222d',
+  border:    '#2A2E39',
+  bull:      '#26a69a',
+  bear:      '#ef5350',
+  basis:     '#2962FF',
+  band:      '#787B86',
+  bxt_pos:   '#26a69a',
+  bxt_neg:   '#ef5350',
+};
+
+let openChartSym = null;
+
+async function fetchBars(sym) {
+  // Yahoo chart endpoint allows CORS
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`;
+  const res = await fetch(url);
+  const j = await res.json();
+  const r = j.chart.result[0];
+  const t = r.timestamp;
+  const q = r.indicators.quote[0];
+  const out = [];
+  for (let i = 0; i < t.length; i++) {
+    if (q.open[i] == null) continue;
+    out.push({
+      time: t[i],
+      open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i],
+    });
+  }
+  return out;
+}
+
+function renderChart(container, bars) {
+  container.innerHTML = '';
+  const closes = bars.map(b => b.close);
+  const { basis, upper, lower } = computeFVB(closes);
+  const bxt = computeBXT(closes);
+
+  // Main pane: candles + bands
+  const priceWrap = document.createElement('div');
+  priceWrap.style.cssText = 'height: 360px; width: 100%;';
+  container.appendChild(priceWrap);
+
+  const priceChart = LightweightCharts.createChart(priceWrap, {
+    layout: { background: { color: TV_COLORS.bg }, textColor: TV_COLORS.text, fontSize: 12, fontFamily: '-apple-system, "Trebuchet MS", sans-serif' },
+    grid: { vertLines: { color: TV_COLORS.grid }, horzLines: { color: TV_COLORS.grid } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: TV_COLORS.border },
+    timeScale: { borderColor: TV_COLORS.border, timeVisible: false, secondsVisible: false },
+    watermark: { visible: false },
+  });
+
+  const candles = priceChart.addCandlestickSeries({
+    upColor: TV_COLORS.bull, downColor: TV_COLORS.bear,
+    borderUpColor: TV_COLORS.bull, borderDownColor: TV_COLORS.bear,
+    wickUpColor: TV_COLORS.bull, wickDownColor: TV_COLORS.bear,
+  });
+  candles.setData(bars);
+
+  const mkLine = (data, color, width=1) => {
+    const s = priceChart.addLineSeries({ color, lineWidth: width, priceLineVisible: false, lastValueVisible: false });
+    s.setData(bars.map((b, i) => data[i] != null ? { time: b.time, value: data[i] } : null).filter(Boolean));
+  };
+  mkLine(basis, TV_COLORS.basis, 2);
+  mkLine(upper, TV_COLORS.band, 1);
+  mkLine(lower, TV_COLORS.band, 1);
+
+  // Sub-pane: BXT histogram
+  const bxtWrap = document.createElement('div');
+  bxtWrap.style.cssText = 'height: 130px; width: 100%; margin-top: 4px;';
+  container.appendChild(bxtWrap);
+
+  const bxtChart = LightweightCharts.createChart(bxtWrap, {
+    layout: { background: { color: TV_COLORS.bg }, textColor: TV_COLORS.text, fontSize: 11, fontFamily: '-apple-system, "Trebuchet MS", sans-serif' },
+    grid: { vertLines: { color: TV_COLORS.grid }, horzLines: { color: TV_COLORS.grid } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: TV_COLORS.border },
+    timeScale: { borderColor: TV_COLORS.border, timeVisible: false, secondsVisible: false },
+    watermark: { visible: true, color: 'rgba(120,123,134,0.3)', text: 'B-Xtrender', fontSize: 14, horzAlign: 'left', vertAlign: 'top' },
+  });
+  const bxtSeries = bxtChart.addHistogramSeries({ priceFormat: { type: 'price', precision: 2, minMove: 0.01 } });
+  bxtSeries.setData(bars.map((b, i) => bxt[i] != null ? {
+    time: b.time, value: bxt[i],
+    color: bxt[i] >= 0 ? TV_COLORS.bxt_pos : TV_COLORS.bxt_neg,
+  } : null).filter(Boolean));
+
+  // Sync time scales between panes
+  priceChart.timeScale().subscribeVisibleLogicalRangeChange(r => r && bxtChart.timeScale().setVisibleLogicalRange(r));
+  bxtChart.timeScale().subscribeVisibleLogicalRangeChange(r => r && priceChart.timeScale().setVisibleLogicalRange(r));
+
+  priceChart.timeScale().fitContent();
+}
+
+async function toggleChart(tr, sym) {
+  const next = tr.nextElementSibling;
+  // If chart is already open under this row, close it
+  if (next && next.classList.contains('chart-row') && next.dataset.sym === sym) {
+    next.remove();
+    openChartSym = null;
+    return;
+  }
+  // Close any other open chart row in any table
+  document.querySelectorAll('tr.chart-row').forEach(el => el.remove());
+
+  const colspan = tr.children.length;
+  const chartRow = document.createElement('tr');
+  chartRow.className = 'chart-row';
+  chartRow.dataset.sym = sym;
+  chartRow.innerHTML = `<td colspan="${colspan}"><div class="chart-container"><div class="chart-header">${sym} · 1Y Daily · THT Fair Value Bands + B-Xtrender</div><div class="chart-body"><div class="chart-loading">Loading…</div></div></div></td>`;
+  tr.parentNode.insertBefore(chartRow, tr.nextSibling);
+  openChartSym = sym;
+
+  try {
+    const bars = await fetchBars(sym);
+    if (bars.length < 25) throw new Error('Not enough bars');
+    const body = chartRow.querySelector('.chart-body');
+    body.innerHTML = '';
+    renderChart(body, bars);
+  } catch (e) {
+    chartRow.querySelector('.chart-body').innerHTML = `<div class="chart-error">Failed to load: ${e.message}</div>`;
+  }
+}
+
+// Click handlers
 document.addEventListener('click', e => {
+  // Sortable header
   const th = e.target.closest('th.sortable');
-  if (!th) return;
-  const col = th.dataset.col;
-  const tableId = th.dataset.table;
-  if (!col || !tableId || col === 'idx') return;
-  const state = sortState[tableId];
-  if (state.col === col) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
-  else { state.col = col; state.dir = (col === 'name' || col === 'sym') ? 'asc' : 'desc'; }
-  if (currentData) {
-    const rows = tableId === 'green-table' ? currentData.both_green : currentData.both_red;
-    document.getElementById(tableId).innerHTML = renderTable(rows, tableId);
+  if (th) {
+    const col = th.dataset.col;
+    const tableId = th.dataset.table;
+    if (!col || !tableId || col === 'idx') return;
+    const state = sortState[tableId];
+    if (state.col === col) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+    else { state.col = col; state.dir = (col === 'name' || col === 'sym') ? 'asc' : 'desc'; }
+    if (currentData) {
+      const rows = tableId === 'green-table' ? currentData.both_green : currentData.both_red;
+      document.getElementById(tableId).innerHTML = renderTable(rows, tableId);
+    }
+    return;
+  }
+  // Clickable row → expand chart
+  const tr = e.target.closest('tr.row-clickable');
+  if (tr) {
+    toggleChart(tr, tr.dataset.sym);
   }
 });
 
@@ -140,9 +351,7 @@ function renderChanges(changes) {
     {label: '🔴 RED dropped',   items: changes.red_removed,   action: 'removed', color: 'red'},
   ];
   const total = buckets.reduce((s,b) => s + (b.items?.length || 0), 0);
-  if (total === 0) {
-    return '<p class="empty">No changes since last refresh.</p>';
-  }
+  if (total === 0) return '<p class="empty">No changes since last refresh.</p>';
   const head = `<table>
     <thead><tr>
       <th>Bucket</th><th>Action</th>
@@ -156,7 +365,7 @@ function renderChanges(changes) {
     </tr></thead><tbody>`;
   const cell = (v, prefix='') => v == null ? '—' : `${prefix}${typeof v === 'number' ? v.toFixed(2) : v}`;
   const body = buckets.flatMap(b =>
-    (b.items || []).map(item => `<tr>
+    (b.items || []).map(item => `<tr class="row-clickable" data-sym="${item.sym}">
       <td>${b.label}</td>
       <td><span class="badge badge-${b.color} badge-${b.action}">${b.action.toUpperCase()}</span></td>
       <td>${item.name}</td>
@@ -191,14 +400,11 @@ async function load() {
 load();
 setInterval(load, 30000);
 
-// Re-fetch immediately when the tab regains focus (defeats browser throttling)
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') load();
 });
 window.addEventListener('focus', load);
 
-// Watchdog: hard reload the whole page if data is more than 12 min old
-// (catches edge cases where setInterval got fully suspended)
 setInterval(() => {
   if (!currentData || !currentData.updated_at) return;
   const ageMin = (Date.now() - new Date(currentData.updated_at)) / 60000;
