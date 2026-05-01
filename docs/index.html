@@ -18,7 +18,18 @@
   <span class="separator">·</span>
   <span id="stats"></span>
 </div>
-<p class="subtitle">US stocks (mcap &gt; $3.5B) where <strong>THT Fair Value Bands</strong> or <strong>B-Xtrender</strong> flipped today. Click any row to expand chart.</p>
+<p class="subtitle">US stocks where <strong>THT Fair Value Bands</strong> or <strong>B-Xtrender</strong> flipped today. Click any row to expand chart.</p>
+<div class="filter-row">
+  <label for="mcap-filter">Min market cap:</label>
+  <select id="mcap-filter">
+    <option value="3.5">$3.5B+</option>
+    <option value="10">$10B+</option>
+    <option value="50">$50B+</option>
+    <option value="200">$200B+</option>
+    <option value="500">$500B+</option>
+    <option value="1000">$1T+</option>
+  </select>
+</div>
 </header>
 
 <main>
@@ -493,7 +504,7 @@ document.addEventListener('click', e => {
     if (state.col === col) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
     else { state.col = col; state.dir = (col === 'name' || col === 'sym') ? 'asc' : 'desc'; }
     if (currentData) {
-      const rows = currentData[TABLE_KEY[tableId]];
+      const rows = filterRows(currentData[TABLE_KEY[tableId]]);
       document.getElementById(tableId).innerHTML = renderTable(rows, tableId);
     }
     return;
@@ -506,6 +517,8 @@ document.addEventListener('click', e => {
 });
 
 let currentData = null;
+let minMcap = parseFloat(localStorage.getItem('minMcap') || '3.5');
+const filterRows = rows => (rows || []).filter(r => (r.mcap || 0) >= minMcap);
 
 function renderChanges(changes) {
   if (!changes) return '<p class="empty">No prior run to compare to.</p>';
@@ -550,19 +563,41 @@ function renderChanges(changes) {
   return head + body + '</tbody></table>';
 }
 
+function renderAll() {
+  if (!currentData) return;
+  const d = currentData;
+  const fg = filterRows(d.fvb_green), fr = filterRows(d.fvb_red);
+  const bg = filterRows(d.bxt_green), br = filterRows(d.bxt_red);
+  document.getElementById('stats').textContent =
+    `${d.scanned_count} scanned in ${d.scan_seconds}s · THT Fair Value Bands ${fg.length}g/${fr.length}r · B-Xtrender ${bg.length}g/${br.length}r`;
+  // Filter changes by mcap too
+  const filteredChanges = { compared_to: d.changes.compared_to };
+  for (const k of ['fvb_green_added','fvb_green_removed','fvb_red_added','fvb_red_removed','bxt_green_added','bxt_green_removed','bxt_red_added','bxt_red_removed']) {
+    filteredChanges[k] = filterRows(d.changes[k]);
+  }
+  document.getElementById('changes-table').innerHTML = renderChanges(filteredChanges);
+  document.getElementById('fvb-green-table').innerHTML = renderTable(fg, 'fvb-green-table');
+  document.getElementById('fvb-red-table').innerHTML   = renderTable(fr, 'fvb-red-table');
+  document.getElementById('bxt-green-table').innerHTML = renderTable(bg, 'bxt-green-table');
+  document.getElementById('bxt-red-table').innerHTML   = renderTable(br, 'bxt-red-table');
+  document.getElementById('updated').textContent = fmtUpd(d.updated_at);
+}
+
+// Filter dropdown
+const filterEl = document.getElementById('mcap-filter');
+filterEl.value = String(minMcap);
+filterEl.addEventListener('change', e => {
+  minMcap = parseFloat(e.target.value);
+  localStorage.setItem('minMcap', String(minMcap));
+  renderAll();
+});
+
 async function load() {
   try {
     const res = await fetch('/tht-dashboard/results.json?t=' + Date.now());
     const data = await res.json();
-    document.getElementById('updated').textContent = fmtUpd(data.updated_at);
-    document.getElementById('stats').textContent =
-      `${data.scanned_count} scanned in ${data.scan_seconds}s · THT Fair Value Bands ${data.fvb_green.length}g/${data.fvb_red.length}r · B-Xtrender ${data.bxt_green.length}g/${data.bxt_red.length}r`;
     currentData = data;
-    document.getElementById('changes-table').innerHTML = renderChanges(data.changes);
-    document.getElementById('fvb-green-table').innerHTML = renderTable(data.fvb_green, 'fvb-green-table');
-    document.getElementById('fvb-red-table').innerHTML   = renderTable(data.fvb_red,   'fvb-red-table');
-    document.getElementById('bxt-green-table').innerHTML = renderTable(data.bxt_green, 'bxt-green-table');
-    document.getElementById('bxt-red-table').innerHTML   = renderTable(data.bxt_red,   'bxt-red-table');
+    renderAll();
   } catch (e) {
     document.getElementById('updated').textContent = 'Failed to load results.json';
   }

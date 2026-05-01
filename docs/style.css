@@ -90,6 +90,12 @@ tr.chart-row td { padding: 0 !important; border-bottom: 1px solid var(--line); }
 .chart-loading, .chart-error { padding: 40px; text-align: center; color: #787B86; font-size: 13px; }
 .chart-error { color: #ef5350; }
 
+.filter-row { margin-top: 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--dim); }
+.filter-row label { font-weight: 500; }
+.filter-row select { background: #1a1a1a; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.filter-row select:hover { border-color: #444; }
+.filter-row select:focus { outline: none; border-color: var(--green); }
+
 footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--dim); font-size: 12px; }
 
 @media (max-width: 600px) {
