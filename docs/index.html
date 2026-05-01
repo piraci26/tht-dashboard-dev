@@ -20,15 +20,9 @@
 </div>
 <p class="subtitle">US stocks where <strong>THT Fair Value Bands</strong> or <strong>B-Xtrender</strong> flipped today. Click any row to expand chart.</p>
 <div class="filter-row">
-  <label for="mcap-filter">Min market cap:</label>
-  <select id="mcap-filter">
-    <option value="3.5">$3.5B+</option>
-    <option value="10">$10B+</option>
-    <option value="50">$50B+</option>
-    <option value="200">$200B+</option>
-    <option value="500">$500B+</option>
-    <option value="1000">$1T+</option>
-  </select>
+  <label for="mcap-filter">Min market cap: $</label>
+  <input id="mcap-filter" type="number" step="0.1" min="0" placeholder="3.5">
+  <span>B+</span>
 </div>
 </header>
 
@@ -583,14 +577,17 @@ function renderAll() {
   document.getElementById('updated').textContent = fmtUpd(d.updated_at);
 }
 
-// Filter dropdown
+// Filter input (free-form number)
 const filterEl = document.getElementById('mcap-filter');
 filterEl.value = String(minMcap);
-filterEl.addEventListener('change', e => {
-  minMcap = parseFloat(e.target.value);
+const onFilterChange = e => {
+  const v = parseFloat(e.target.value);
+  minMcap = isNaN(v) || v < 0 ? 0 : v;
   localStorage.setItem('minMcap', String(minMcap));
   renderAll();
-});
+};
+filterEl.addEventListener('input', onFilterChange);
+filterEl.addEventListener('change', onFilterChange);
 
 async function load() {
   try {
