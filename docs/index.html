@@ -28,22 +28,22 @@
 </section>
 
 <section class="green">
-<h2><span class="dot dot-green"></span>FVB flipped GREEN today</h2>
+<h2><span class="dot dot-green"></span>THT Fair Value Bands flipped GREEN today</h2>
 <div id="fvb-green-table" class="table-wrap"></div>
 </section>
 
 <section class="red">
-<h2><span class="dot dot-red"></span>FVB flipped RED today</h2>
+<h2><span class="dot dot-red"></span>THT Fair Value Bands flipped RED today</h2>
 <div id="fvb-red-table" class="table-wrap"></div>
 </section>
 
 <section class="green">
-<h2><span class="dot dot-green"></span>BXT flipped GREEN today</h2>
+<h2><span class="dot dot-green"></span>B-Xtrender flipped GREEN today</h2>
 <div id="bxt-green-table" class="table-wrap"></div>
 </section>
 
 <section class="red">
-<h2><span class="dot dot-red"></span>BXT flipped RED today</h2>
+<h2><span class="dot dot-red"></span>B-Xtrender flipped RED today</h2>
 <div id="bxt-red-table" class="table-wrap"></div>
 </section>
 </main>
@@ -510,14 +510,14 @@ let currentData = null;
 function renderChanges(changes) {
   if (!changes) return '<p class="empty">No prior run to compare to.</p>';
   const buckets = [
-    {label: 'FVB 🟢 New',     items: changes.fvb_green_added,   action: 'added',   color: 'green'},
-    {label: 'FVB 🟢 Dropped', items: changes.fvb_green_removed, action: 'removed', color: 'green'},
-    {label: 'FVB 🔴 New',     items: changes.fvb_red_added,     action: 'added',   color: 'red'},
-    {label: 'FVB 🔴 Dropped', items: changes.fvb_red_removed,   action: 'removed', color: 'red'},
-    {label: 'BXT 🟢 New',     items: changes.bxt_green_added,   action: 'added',   color: 'green'},
-    {label: 'BXT 🟢 Dropped', items: changes.bxt_green_removed, action: 'removed', color: 'green'},
-    {label: 'BXT 🔴 New',     items: changes.bxt_red_added,     action: 'added',   color: 'red'},
-    {label: 'BXT 🔴 Dropped', items: changes.bxt_red_removed,   action: 'removed', color: 'red'},
+    {label: 'THT Fair Value Bands 🟢 New',     items: changes.fvb_green_added,   action: 'added',   color: 'green'},
+    {label: 'THT Fair Value Bands 🟢 Dropped', items: changes.fvb_green_removed, action: 'removed', color: 'green'},
+    {label: 'THT Fair Value Bands 🔴 New',     items: changes.fvb_red_added,     action: 'added',   color: 'red'},
+    {label: 'THT Fair Value Bands 🔴 Dropped', items: changes.fvb_red_removed,   action: 'removed', color: 'red'},
+    {label: 'B-Xtrender 🟢 New',     items: changes.bxt_green_added,   action: 'added',   color: 'green'},
+    {label: 'B-Xtrender 🟢 Dropped', items: changes.bxt_green_removed, action: 'removed', color: 'green'},
+    {label: 'B-Xtrender 🔴 New',     items: changes.bxt_red_added,     action: 'added',   color: 'red'},
+    {label: 'B-Xtrender 🔴 Dropped', items: changes.bxt_red_removed,   action: 'removed', color: 'red'},
   ];
   const total = buckets.reduce((s,b) => s + (b.items?.length || 0), 0);
   if (total === 0) return '<p class="empty">No changes since last refresh.</p>';
@@ -556,7 +556,7 @@ async function load() {
     const data = await res.json();
     document.getElementById('updated').textContent = fmtUpd(data.updated_at);
     document.getElementById('stats').textContent =
-      `${data.scanned_count} scanned in ${data.scan_seconds}s · FVB ${data.fvb_green.length}g/${data.fvb_red.length}r · BXT ${data.bxt_green.length}g/${data.bxt_red.length}r`;
+      `${data.scanned_count} scanned in ${data.scan_seconds}s · THT Fair Value Bands ${data.fvb_green.length}g/${data.fvb_red.length}r · B-Xtrender ${data.bxt_green.length}g/${data.bxt_red.length}r`;
     currentData = data;
     document.getElementById('changes-table').innerHTML = renderChanges(data.changes);
     document.getElementById('fvb-green-table').innerHTML = renderTable(data.fvb_green, 'fvb-green-table');
