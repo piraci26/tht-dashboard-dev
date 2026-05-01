@@ -90,12 +90,37 @@ tr.chart-row td { padding: 0 !important; border-bottom: 1px solid var(--line); }
 .chart-loading, .chart-error { padding: 40px; text-align: center; color: #787B86; font-size: 13px; }
 .chart-error { color: #ef5350; }
 
-.filter-row { margin-top: 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--dim); }
-.filter-row label { font-weight: 500; }
-.filter-row input { background: #1a1a1a; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; font-size: 13px; font-family: inherit; width: 90px; font-variant-numeric: tabular-nums; }
-.filter-row input:hover { border-color: #444; }
-.filter-row input:focus { outline: none; border-color: var(--green); }
-.filter-row input::-webkit-outer-spin-button, .filter-row input::-webkit-inner-spin-button { opacity: 1; }
+.filter-row { margin-top: 16px; display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--dim); flex-wrap: wrap; }
+.filter-row label { font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; font-size: 11px; color: var(--dim); }
+.filter-input-group {
+  display: inline-flex; align-items: center;
+  background: #141414; border: 1px solid var(--line); border-radius: 8px;
+  padding: 0 12px; transition: border-color 0.15s, box-shadow 0.15s;
+  font-variant-numeric: tabular-nums;
+}
+.filter-input-group:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0,255,187,0.08); }
+.filter-prefix, .filter-suffix { color: var(--dim); font-size: 13px; user-select: none; }
+.filter-prefix { padding-right: 4px; }
+.filter-suffix { padding-left: 2px; font-weight: 500; color: #aaa; }
+.filter-input-group input {
+  background: transparent; color: var(--fg); border: none;
+  font-size: 14px; font-weight: 600; font-family: inherit;
+  width: 70px; padding: 8px 0; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.filter-input-group input:focus { outline: none; }
+.filter-input-group input::-webkit-outer-spin-button, .filter-input-group input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.filter-input-group input[type=number] { -moz-appearance: textfield; }
+
+.filter-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-presets button {
+  background: #141414; color: var(--dim); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
+  font-variant-numeric: tabular-nums;
+}
+.filter-presets button:hover { color: var(--fg); border-color: #3a3a3a; background: #1c1c1c; }
+.filter-presets button.active { background: var(--green-dim); color: var(--green); border-color: var(--green); }
 
 footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--dim); font-size: 12px; }
 

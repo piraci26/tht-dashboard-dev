@@ -20,9 +20,19 @@
 </div>
 <p class="subtitle">US stocks where <strong>THT Fair Value Bands</strong> or <strong>B-Xtrender</strong> flipped today. Click any row to expand chart.</p>
 <div class="filter-row">
-  <label for="mcap-filter">Min market cap: $</label>
-  <input id="mcap-filter" type="number" step="0.1" min="0" placeholder="3.5">
-  <span>B+</span>
+  <label for="mcap-filter">Min market cap</label>
+  <div class="filter-input-group">
+    <span class="filter-prefix">$</span>
+    <input id="mcap-filter" type="number" step="0.1" min="0" placeholder="3.5">
+    <span class="filter-suffix">B+</span>
+  </div>
+  <div class="filter-presets">
+    <button type="button" data-mcap="3.5">$3.5B</button>
+    <button type="button" data-mcap="10">$10B</button>
+    <button type="button" data-mcap="50">$50B</button>
+    <button type="button" data-mcap="200">$200B</button>
+    <button type="button" data-mcap="1000">$1T</button>
+  </div>
 </div>
 </header>
 
@@ -585,9 +595,26 @@ const onFilterChange = e => {
   minMcap = isNaN(v) || v < 0 ? 0 : v;
   localStorage.setItem('minMcap', String(minMcap));
   renderAll();
+  syncPresets();
 };
 filterEl.addEventListener('input', onFilterChange);
 filterEl.addEventListener('change', onFilterChange);
+
+function syncPresets() {
+  document.querySelectorAll('.filter-presets button').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.mcap) === minMcap);
+  });
+}
+document.querySelectorAll('.filter-presets button').forEach(b => {
+  b.addEventListener('click', () => {
+    minMcap = parseFloat(b.dataset.mcap);
+    filterEl.value = String(minMcap);
+    localStorage.setItem('minMcap', String(minMcap));
+    renderAll();
+    syncPresets();
+  });
+});
+syncPresets();
 
 async function load() {
   try {
