@@ -90,17 +90,95 @@ h1 {
 }
 .meta #stats { color: #b0b0b0; }
 .separator { margin: 0 10px; opacity: 0.45; }
+
+/* ─── Version toggle — calm "back to production" affordance ──────── */
 .version-toggle {
+  position: relative;
+  margin-left: auto;        /* push to far right; wraps gracefully on small screens */
   font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--dim); text-decoration: none;
-  padding: 4px 10px; border: 1px solid var(--line); border-radius: 4px;
-  background: rgba(255,255,255,0.02); transition: all 0.15s;
-  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #c0c0c0; text-decoration: none;
+  padding: 5px 10px 5px 8px;
+  border: 1px solid var(--line); border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0)) ,
+    rgba(10,10,10,0.6);
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  transition:
+    color 160ms ease, border-color 160ms ease,
+    background-color 160ms ease, transform 160ms ease,
+    box-shadow 160ms ease;
 }
-.version-toggle:hover { color: var(--green); border-color: rgba(0,255,187,0.4); background: rgba(0,255,187,0.06); }
-.version-toggle .arrow { transition: transform 0.15s; }
-.version-toggle:hover .arrow { transform: translateX(-2px); }
+.version-toggle .vt-arrow {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #888;
+  transition: transform 180ms cubic-bezier(.2,.7,.2,1), color 160ms ease;
+  margin-right: -2px;
+}
+.version-toggle .vt-tag {
+  color: var(--green);
+  font-weight: 700; letter-spacing: 0.1em;
+  /* hairline divider between tag and label */
+  padding-right: 8px;
+  border-right: 1px solid var(--line);
+  transition: border-color 160ms ease;
+}
+.version-toggle .vt-label {
+  color: #c8c8c8;
+  font-weight: 500; letter-spacing: 0.05em;
+}
+.version-toggle:hover,
+.version-toggle:focus-visible {
+  color: #fff;
+  border-color: rgba(0,255,187,0.35);
+  background:
+    linear-gradient(180deg, rgba(0,255,187,0.05), rgba(0,255,187,0)) ,
+    rgba(10,10,10,0.7);
+  transform: translateY(-0.5px);
+  box-shadow:
+    0 0 0 1px rgba(0,255,187,0.08),
+    0 4px 14px -8px rgba(0,255,187,0.35);
+}
+.version-toggle:hover .vt-tag,
+.version-toggle:focus-visible .vt-tag {
+  border-right-color: rgba(0,255,187,0.25);
+}
+.version-toggle:hover .vt-label,
+.version-toggle:focus-visible .vt-label {
+  color: #f0f0f0;
+}
+.version-toggle:hover .vt-arrow,
+.version-toggle:focus-visible .vt-arrow {
+  color: var(--green);
+  transform: translateX(-3px);
+}
+.version-toggle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(0,255,187,0.35),
+    0 4px 14px -8px rgba(0,255,187,0.35);
+}
+.version-toggle:active { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .version-toggle,
+  .version-toggle .vt-arrow,
+  .version-toggle .vt-tag {
+    transition: none;
+  }
+  .version-toggle:hover,
+  .version-toggle:focus-visible { transform: none; }
+  .version-toggle:hover .vt-arrow,
+  .version-toggle:focus-visible .vt-arrow { transform: none; }
+}
+
+@media (max-width: 600px) {
+  /* On mobile, allow the meta row to wrap so the toggle drops cleanly to its own line */
+  .meta { flex-wrap: wrap; white-space: normal; row-gap: 8px; }
+  /* Hide the trailing separator that immediately precedes the toggle when wrapped */
+  .meta .separator:last-of-type { display: none; }
+  .version-toggle { margin-left: 0; }
+}
 
 .subtitle {
   color: var(--dim); margin-top: 14px;
