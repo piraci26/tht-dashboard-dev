@@ -315,8 +315,8 @@ function renderChart(container, bars, sym) {
   headBar.className = 'tv-header';
   headBar.innerHTML = `
     <span class="tv-sym">${sym}</span>
-    <span class="tv-tf">· 1D ·</span>
-    <span class="tv-ohlc">O <b>${last.open.toFixed(2)}</b> H <b>${last.high.toFixed(2)}</b> L <b>${last.low.toFixed(2)}</b> C <b>${last.close.toFixed(2)}</b></span>
+    <span class="tv-tf">1D</span>
+    <span class="tv-ohlc"><span>O<b>${last.open.toFixed(2)}</b></span><span>H<b>${last.high.toFixed(2)}</b></span><span>L<b>${last.low.toFixed(2)}</b></span><span>C<b>${last.close.toFixed(2)}</b></span></span>
     <span class="tv-change" style="color:${chCol}">${ch >= 0 ? '+' : ''}${ch.toFixed(2)} (${ch >= 0 ? '+' : ''}${chPct.toFixed(2)}%)</span>
   `;
   container.appendChild(headBar);
@@ -506,7 +506,7 @@ async function toggleChart(tr, sym) {
   const chartRow = document.createElement('tr');
   chartRow.className = 'chart-row';
   chartRow.dataset.sym = sym;
-  chartRow.innerHTML = `<td colspan="${colspan}"><div class="chart-container"><div class="chart-body"><div class="chart-loading">Loading…</div></div></div></td>`;
+  chartRow.innerHTML = `<td colspan="${colspan}"><div class="chart-container"><div class="chart-body"><div class="chart-loading" role="status" aria-live="polite"><span class="sr-only">Loading chart</span></div></div></div></td>`;
   tr.parentNode.insertBefore(chartRow, tr.nextSibling);
   openChartSym = sym;
 
