@@ -190,7 +190,7 @@ function renderTable(rows, tableId) {
     <td class="num col-price"><span class="unit">$</span>${r.price.toFixed(2)}</td>
     <td class="num col-basis"><span class="unit">$</span>${r.basis.toFixed(2)}</td>
     <td class="num col-bxt">${r.bxt_today.toFixed(2)}</td>
-    <td class="num col-streak">${streak != null ? streak + '<span class="unit">d</span>' : '<span class="unit">—</span>'}</td>
+    <td class="num col-streak">${streak != null ? streak + '<span class="unit">' + (timeframe === 'weekly' ? 'W' : timeframe === 'monthly' ? 'M' : 'd') + '</span>' : '<span class="unit">—</span>'}</td>
     <td class="num col-ath">${r.ath != null ? '<span class="unit">$</span>' + r.ath.toFixed(2) : '<span class="unit">—</span>'}</td>
     <td class="num col-pct">${fmtPct(r.pct_to_ath)}</td>
   </tr>`;
