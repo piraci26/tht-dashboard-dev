@@ -161,15 +161,15 @@ function renderTable(rows, tableId) {
   }).join('');
   const head = `<table><thead><tr>${headCells}</tr></thead><tbody>`;
   const body = sorted.map((r,i) => `<tr class="row-clickable" data-sym="${r.sym}">
-    <td class="num">${i+1}</td>
-    <td>${r.name}</td>
+    <td class="num col-idx">${i+1}</td>
+    <td class="col-name">${r.name}</td>
     <td><strong>${r.sym}</strong></td>
-    <td class="num">${fmtMcap(r.mcap)}</td>
-    <td class="num">$${r.price.toFixed(2)}</td>
-    <td class="num">$${r.basis.toFixed(2)}</td>
-    <td class="num">${r.bxt_today.toFixed(2)}</td>
-    <td class="num">${r.ath != null ? '$' + r.ath.toFixed(2) : '—'}</td>
-    <td class="num">${fmtPct(r.pct_to_ath)}</td>
+    <td class="num col-mcap">${fmtMcap(r.mcap)}</td>
+    <td class="num col-price"><span class="unit">$</span>${r.price.toFixed(2)}</td>
+    <td class="num col-basis"><span class="unit">$</span>${r.basis.toFixed(2)}</td>
+    <td class="num col-bxt">${r.bxt_today.toFixed(2)}</td>
+    <td class="num col-ath">${r.ath != null ? '<span class="unit">$</span>' + r.ath.toFixed(2) : '<span class="unit">—</span>'}</td>
+    <td class="num col-pct">${fmtPct(r.pct_to_ath)}</td>
   </tr>`).join('');
   return head + body + '</tbody></table>';
 }
@@ -577,19 +577,20 @@ function renderChanges(changes) {
       <th class="num">ATH</th>
       <th class="num">% to ATH</th>
     </tr></thead><tbody>`;
-  const cell = (v, prefix='') => v == null ? '—' : `${prefix}${typeof v === 'number' ? v.toFixed(2) : v}`;
+  const usd = v => v == null ? '<span class="unit">—</span>' : `<span class="unit">$</span>${v.toFixed(2)}`;
+  const num = v => v == null ? '<span class="unit">—</span>' : v.toFixed(2);
   const body = buckets.flatMap(b =>
     (b.items || []).map(item => `<tr class="row-clickable" data-sym="${item.sym}">
-      <td>${b.label}</td>
-      <td><span class="badge badge-${b.color} badge-${b.action}">${b.action.toUpperCase()}</span></td>
-      <td>${item.name}</td>
+      <td class="col-bucket">${b.label}</td>
+      <td><span class="badge badge-${b.color} badge-${b.action}">${b.action}</span></td>
+      <td class="col-name">${item.name}</td>
       <td><strong>${item.sym}</strong></td>
-      <td class="num">${fmtMcap(item.mcap)}</td>
-      <td class="num">${cell(item.price, '$')}</td>
-      <td class="num">${cell(item.basis, '$')}</td>
-      <td class="num">${cell(item.bxt_today)}</td>
-      <td class="num">${cell(item.ath, '$')}</td>
-      <td class="num">${item.pct_to_ath != null ? '+' + item.pct_to_ath.toFixed(1) + '%' : '—'}</td>
+      <td class="num col-mcap">${fmtMcap(item.mcap)}</td>
+      <td class="num col-price">${usd(item.price)}</td>
+      <td class="num col-basis">${usd(item.basis)}</td>
+      <td class="num col-bxt">${num(item.bxt_today)}</td>
+      <td class="num col-ath">${usd(item.ath)}</td>
+      <td class="num col-pct">${item.pct_to_ath != null ? '+' + item.pct_to_ath.toFixed(1) + '%' : '<span class="unit">—</span>'}</td>
     </tr>`)
   ).join('');
   return head + body + '</tbody></table>';
