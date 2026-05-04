@@ -90,6 +90,17 @@ h1 {
 }
 .meta #stats { color: #b0b0b0; }
 .separator { margin: 0 10px; opacity: 0.45; }
+.version-toggle {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--dim); text-decoration: none;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 4px;
+  background: rgba(255,255,255,0.02); transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.version-toggle:hover { color: var(--green); border-color: rgba(0,255,187,0.4); background: rgba(0,255,187,0.06); }
+.version-toggle .arrow { transition: transform 0.15s; }
+.version-toggle:hover .arrow { transform: translateX(-2px); }
 
 .subtitle {
   color: var(--dim); margin-top: 14px;
