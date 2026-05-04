@@ -90,15 +90,26 @@ tr.chart-row td { padding: 0 !important; border-bottom: 1px solid var(--line); }
 .chart-loading, .chart-error { padding: 40px; text-align: center; color: #787B86; font-size: 13px; }
 .chart-error { color: #ef5350; }
 
-.tab-row { margin-top: 16px; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-.tab-btn {
-  background: transparent; color: var(--dim); border: none;
-  padding: 10px 18px; font-size: 13px; font-weight: 600; letter-spacing: 0.03em;
-  cursor: pointer; font-family: inherit; transition: color 0.12s, border-color 0.12s;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
+/* Segmented-control style tabs (Daily / Weekly) */
+.tab-row {
+  margin-top: 18px; display: inline-flex; align-items: center;
+  background: #0e0e0e; border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px; gap: 2px; position: relative;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
 }
-.tab-btn:hover { color: var(--fg); }
-.tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+.tab-btn {
+  position: relative; background: transparent; color: var(--dim); border: none;
+  padding: 7px 22px; font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; cursor: pointer; font-family: inherit;
+  border-radius: 999px; transition: color 0.18s ease;
+  font-variant-numeric: tabular-nums;
+}
+.tab-btn:hover { color: #cfcfcf; }
+.tab-btn.active {
+  color: #0a0a0a; background: var(--green);
+  box-shadow: 0 0 0 1px rgba(0,255,187,0.15), 0 6px 18px -6px rgba(0,255,187,0.45);
+}
+.tab-btn:not(.active):active { transform: scale(0.97); }
 
 .filter-row { margin-top: 16px; display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--dim); flex-wrap: wrap; }
 .filter-row label { font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; font-size: 11px; color: var(--dim); }
