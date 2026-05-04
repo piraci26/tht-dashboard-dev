@@ -90,6 +90,16 @@ tr.chart-row td { padding: 0 !important; border-bottom: 1px solid var(--line); }
 .chart-loading, .chart-error { padding: 40px; text-align: center; color: #787B86; font-size: 13px; }
 .chart-error { color: #ef5350; }
 
+.tab-row { margin-top: 16px; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tab-btn {
+  background: transparent; color: var(--dim); border: none;
+  padding: 10px 18px; font-size: 13px; font-weight: 600; letter-spacing: 0.03em;
+  cursor: pointer; font-family: inherit; transition: color 0.12s, border-color 0.12s;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--fg); }
+.tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+
 .filter-row { margin-top: 16px; display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--dim); flex-wrap: wrap; }
 .filter-row label { font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; font-size: 11px; color: var(--dim); }
 .filter-input-group {

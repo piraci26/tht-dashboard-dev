@@ -18,7 +18,11 @@
   <span class="separator">·</span>
   <span id="stats"></span>
 </div>
-<p class="subtitle">US stocks where <strong>THT Fair Value Bands</strong> or <strong>B-Xtrender</strong> flipped today. Click any row to expand chart.</p>
+<p class="subtitle">US stocks where <strong>THT Fair Value Bands</strong> or <strong>B-Xtrender</strong> flipped. Click any row to expand chart.</p>
+<div class="tab-row">
+  <button class="tab-btn active" data-tf="daily">Daily</button>
+  <button class="tab-btn" data-tf="weekly">Weekly</button>
+</div>
 <div class="filter-row">
   <label for="mcap-filter">Min market cap</label>
   <div class="filter-input-group">
@@ -265,7 +269,7 @@ let openChartSym = null;
 
 async function fetchBars(sym) {
   // Bars are pre-cached by scan.py in the prod repo (same origin, no CORS).
-  const url = `/tht-dashboard/bars/${encodeURIComponent(sym)}.json?t=${Date.now()}`;
+  const url = `/tht-dashboard/${barsBaseUrl()}/${encodeURIComponent(sym)}.json?t=${Date.now()}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} (no cached bars for ${sym})`);
   return await res.json();
@@ -522,7 +526,10 @@ document.addEventListener('click', e => {
 
 let currentData = null;
 let minMcap = parseFloat(localStorage.getItem('minMcap') || '3.5');
+let timeframe = localStorage.getItem('timeframe') || 'daily';
 const filterRows = rows => (rows || []).filter(r => (r.mcap || 0) >= minMcap);
+const resultsUrl = () => timeframe === 'daily' ? 'results.json' : `results_${timeframe}.json`;
+const barsBaseUrl = () => timeframe === 'daily' ? 'bars' : `bars_${timeframe}`;
 
 function renderChanges(changes) {
   if (!changes) return '<p class="empty">No prior run to compare to.</p>';
@@ -616,9 +623,31 @@ document.querySelectorAll('.filter-presets button').forEach(b => {
 });
 syncPresets();
 
+// Tabs (Daily / Weekly)
+function syncTabs() {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tf === timeframe);
+  });
+}
+document.querySelectorAll('.tab-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    if (b.dataset.tf === timeframe) return;
+    timeframe = b.dataset.tf;
+    localStorage.setItem('timeframe', timeframe);
+    syncTabs();
+    // Close any open chart since bars source changes
+    document.querySelectorAll('tr.chart-row').forEach(el => el.remove());
+    openChartSym = null;
+    currentData = null;
+    document.getElementById('updated').textContent = 'Loading...';
+    load();
+  });
+});
+syncTabs();
+
 async function load() {
   try {
-    const res = await fetch('/tht-dashboard/results.json?t=' + Date.now());
+    const res = await fetch('/tht-dashboard/' + resultsUrl() + '?t=' + Date.now());
     const data = await res.json();
     currentData = data;
     renderAll();
