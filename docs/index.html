@@ -620,6 +620,14 @@ function renderChanges(changes) {
   return head + body + '</tbody></table>';
 }
 
+function tableHostsOpenChart(wrapId) {
+  return !!document.querySelector(`#${wrapId} tr.chart-row`);
+}
+function setIfNotOpen(wrapId, html) {
+  if (tableHostsOpenChart(wrapId)) return;
+  document.getElementById(wrapId).innerHTML = html;
+}
+
 function renderAll() {
   if (!currentData) return;
   const d = currentData;
@@ -632,11 +640,11 @@ function renderAll() {
   for (const k of ['fvb_green_added','fvb_green_removed','fvb_red_added','fvb_red_removed','bxt_green_added','bxt_green_removed','bxt_red_added','bxt_red_removed']) {
     filteredChanges[k] = filterRows(d.changes[k]);
   }
-  document.getElementById('changes-table').innerHTML = renderChanges(filteredChanges);
-  document.getElementById('fvb-green-table').innerHTML = renderTable(fg, 'fvb-green-table');
-  document.getElementById('fvb-red-table').innerHTML   = renderTable(fr, 'fvb-red-table');
-  document.getElementById('bxt-green-table').innerHTML = renderTable(bg, 'bxt-green-table');
-  document.getElementById('bxt-red-table').innerHTML   = renderTable(br, 'bxt-red-table');
+  setIfNotOpen('changes-table',  renderChanges(filteredChanges));
+  setIfNotOpen('fvb-green-table', renderTable(fg, 'fvb-green-table'));
+  setIfNotOpen('fvb-red-table',   renderTable(fr, 'fvb-red-table'));
+  setIfNotOpen('bxt-green-table', renderTable(bg, 'bxt-green-table'));
+  setIfNotOpen('bxt-red-table',   renderTable(br, 'bxt-red-table'));
   document.getElementById('updated').textContent = fmtUpd(d.updated_at);
 }
 
